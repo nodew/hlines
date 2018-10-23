@@ -1,0 +1,59 @@
+name:                hlines
+version:             0.1.0.0
+github:              "nodew/hlines"
+license:             BSD3
+author:              "Joe Wang"
+maintainer:          "wangqiao11@hotmail.com"
+copyright:           "MIT"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/nodew/hlines#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- filepath >= 1.3 && < 1.5
+- directory >= 1.3 && < 1.4
+- async >= 2.2 && < 2.3
+- parallel == 3.2.*
+- text >= 1.2 && < 1.3
+- mtl >= 2.2 && < 2.3
+- lens >=4.10 && < 4.18
+- cmdargs
+
+default-extensions:
+- OverloadedStrings
+
+library:
+  source-dirs: src
+
+executables:
+  hlines:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hlines
+
+tests:
+  hlines-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hlines
