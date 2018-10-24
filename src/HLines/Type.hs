@@ -27,8 +27,10 @@ data Language
   = JavaScript
   | TypeScript
   | Haskell
+  | HTML
+  | PHP
   | Unknown
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Comment = Comment
   { single :: [T.Text]

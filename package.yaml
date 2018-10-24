@@ -29,6 +29,7 @@ dependencies:
 - mtl >= 2.2 && < 2.3
 - lens >=4.10 && < 4.18
 - cmdargs
+- containers >= 0.5 && < 0.7
 
 default-extensions:
 - OverloadedStrings
@@ -44,6 +45,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -O2
     dependencies:
     - hlines
 
