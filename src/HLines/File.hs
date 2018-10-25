@@ -1,7 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module HLines.File ( countLines ) where
+module HLines.File
+  ( countLines
+  , readContent
+  ) where
 
 import Control.Exception (catch)
 import Control.Lens
@@ -18,35 +21,35 @@ import System.IO.Error (IOError)
 import HLines.Language
 import HLines.Type
 
-type CountState = State ([String], Count, String)
-
 trimLeft :: T.Text -> T.Text
 trimLeft = T.dropWhile isSpace
 
 initCount :: Count
 initCount = Count 0 0 0 0
 
-countLines :: FilePath -> IO (FilePath, Language, Count)
-countLines file = do
-  contents <- T.readFile file `catch` (\(_ :: IOError) -> return "")
+readContent :: FilePath -> IO (Language, T.Text)
+readContent file = do
+  content <- T.readFile file `catch` (\(_ :: IOError) -> return "")
   let ext = takeExtension file
-      lines' = T.lines contents
       lang = getLangFromExt $ T.pack ext
+  return (lang, content)
+
+countLines :: Language -> T.Text -> Count
+countLines lang content =
+  let lines' = T.lines content
       comments = getCommentStyle lang
-      (count, _) = foldl (countLines' comments) (initCount, Nothing) lines'
-  return (file, lang, count)
+   in fst $ foldl (countLines' comments) (initCount, Nothing) lines'
 
 countLines' :: Comment -> (Count, Maybe T.Text) -> T.Text -> (Count, Maybe T.Text)
 countLines' comment (count, start) line = countLines'' comment (count', start) line'
-   where
+  where
     line' = trimLeft line
     count' = count & total +~ 1
-    
+
 countLines'' :: Comment -> (Count, Maybe T.Text) -> T.Text -> (Count, Maybe T.Text)
-countLines'' (Comment [] []) (count, _) _ = (count & code +~ 1, Nothing)
-countLines'' _ (count, start) "" = (count & blank +~ 1, start)
+countLines'' _ (count, open) "" = (count & blank +~ 1, open)
 countLines'' (Comment [] _) (count, Nothing) _ = (count & code +~ 1, Nothing)
-countLines'' Comment{..} (count, Nothing) line =
+countLines'' Comment {..} (count, Nothing) line =
   if and $ map (\c -> c `T.isPrefixOf` line) single
     then (count & comment +~ 1, Nothing)
     else case find (\c -> fst c `T.isPrefixOf` line) multi of
@@ -55,10 +58,12 @@ countLines'' Comment{..} (count, Nothing) line =
              if snd m `T.isInfixOf` line
                then (count & comment +~ 1, Nothing)
                else (count & comment +~ 1, Just $ fst m)
-countLines'' Comment {..} (count, Just start) line =
-  case lookup start multi of
-    Nothing -> (count, Nothing)
-    Just end ->
-      if end `T.isInfixOf` line
-        then (count & comment +~ 1, Nothing)
-        else (count & comment +~ 1, Just start)
+countLines'' Comment {..} (count, Just open) line = (count & comment +~ 1, open')
+  where
+    open' =
+      case lookup open multi of
+        Just _close ->
+          if _close `T.isInfixOf` line
+            then Nothing
+            else Just open
+        _ -> Nothing

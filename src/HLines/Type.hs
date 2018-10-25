@@ -23,18 +23,3 @@ data Count = Count
 
 makeLenses ''Count
 
-data Language
-  = JavaScript
-  | TypeScript
-  | Haskell
-  | HTML
-  | PHP
-  | Unknown
-  deriving (Show, Eq, Ord)
-
-data Comment = Comment
-  { single :: [T.Text]
-  , multi :: [(T.Text, T.Text)]
-  }
-
-type Result = [(Language, Count)]
