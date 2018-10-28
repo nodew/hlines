@@ -6,8 +6,19 @@ import System.Console.CmdArgs
 options =
   Options
     { files = def &= args &= typ "FILES/DIRS"
-    , ignore_ = def &= help "Ignore pattern"
-    , language = def &= help "Count lines by language"
+    , include = def &= help "Include dirs"
+    , exclude = def &= help "Exclude dirs"
+    , match = def &= help "Match filename to search"
+    , language = def &= name "lang" &= typ "Lang" &= help "Language to search"
+    , extension = def &= name "ext" &= typ "EXT" &= help "File extensions to search"
+    , listBy = enum [ListByLang &= help "List result by lang - DEFAULT", ListByFile &= help "List result by file"]
+    , sortBy =
+        enum
+          [ SortByCode &= help "Sort result by code lines - DEFAULT"
+          , SortByFile &= help "Sort result by file counts"
+          , SortByComment &= help "Sort result by comment lines"
+          , SortByBlank &= help "Sort result by blank lines"
+          ]
     } &=
   verbosity &=
   help "Counts your source code" &=
