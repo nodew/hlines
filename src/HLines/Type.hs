@@ -154,7 +154,7 @@ data Count = Count
   , _blank :: Int
   , _comment :: Int
   , _total :: Int
-  } deriving (Show)
+  } deriving (Show, Eq)
 
 makeLenses ''Count
 
@@ -162,3 +162,4 @@ data Comment = Comment
   { single :: [T.Text]
   , multi :: [(T.Text, T.Text)]
   }
+  deriving (Show)

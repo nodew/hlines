@@ -9,7 +9,7 @@ module HLines.File
 import Control.Exception (catch)
 import Control.Lens
 import Control.Monad.State
-import Data.List (all, find, foldl')
+import Data.List (any, find, foldl')
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -25,7 +25,7 @@ initCount = Count 0 0 0 0
 
 readContent :: FilePath -> IO (Language, T.Text)
 readContent file = do
-  content <- T.readFile file `catch` (\(_ :: IOError) -> return "")
+  content <- T.readFile file `catch` (\(e :: IOError) -> return $ T.pack $ show e)
   let ext = takeExtension file
       lang = getLangFromExt $ T.pack ext
   return (lang, content)
@@ -44,22 +44,24 @@ countLines' comment (count, start) line = countLines'' comment (count', start) l
 
 countLines'' :: Comment -> (Count, Maybe T.Text) -> T.Text -> (Count, Maybe T.Text)
 countLines'' _ (count, open) "" = (count & blank +~ 1, open)
-countLines'' (Comment [] _) (count, Nothing) _ = (count & code +~ 1, Nothing)
+countLines'' (Comment [] []) (count, Nothing) _ = (count & code +~ 1, Nothing)
 countLines'' Comment {..} (count, Nothing) line =
-  if all (\c -> c `T.isPrefixOf` line) single
+  if any (\c -> c `T.isPrefixOf` line) single
     then (count & comment +~ 1, Nothing)
     else case find (\c -> fst c `T.isPrefixOf` line) multi of
            Nothing -> (count & code +~ 1, Nothing)
            Just m ->
              if snd m `T.isInfixOf` line
-               then (count & comment +~ 1, Nothing)
+               then if (snd m `T.isSuffixOf` (T.stripEnd line))
+                  then (count & comment +~ 1, Nothing)
+                  else (count & code +~ 1, Nothing)
                else (count & comment +~ 1, Just $ fst m)
-countLines'' Comment {..} (count, Just open) line = (count & comment +~ 1, open')
-  where
-    open' =
-      case lookup open multi of
-        Just _close ->
-          if _close `T.isInfixOf` line
-            then Nothing
-            else Just open
-        _ -> Nothing
+countLines'' Comment {..} (count, Just open) line =
+  case lookup open multi of
+    Just _close ->
+      if _close `T.isInfixOf` line
+        then if (_close `T.isSuffixOf` (T.stripEnd line))
+              then (count & comment +~ 1, Nothing)
+              else (count & code +~ 1, Nothing)
+        else (count & comment +~ 1, Just open)
+    _ -> (count, Just open)
