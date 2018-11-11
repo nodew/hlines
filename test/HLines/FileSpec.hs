@@ -1,8 +1,25 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module HLines.FileSpec where
 
 import Test.Hspec
-import HLines.File
+import HLines.Counter
 import HLines.Type
+import HLines.Language
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import System.IO
+import System.IO.Error (IOError)
+import Control.Exception (catch)
+import System.FilePath (takeExtension)
+
+readContent :: FilePath -> IO (Comment, [T.Text])
+readContent file = do
+  content <- T.readFile file `catch` (\(e :: IOError) -> return $ T.pack $ show e)
+  let ext = takeExtension file
+      lang = getLangFromExt $ T.pack ext
+      comments = getCommentStyle lang
+  return (comments, T.lines content)
 
 spec :: Spec
 spec = do
@@ -33,7 +50,7 @@ spec = do
 
     it "OCAML" $ do
       (lang, content) <- readContent "test-data/ocaml.ml"
-      countLines lang content `shouldBe` Count 3 4 6 14
+      countLines lang content `shouldBe` Count 3 4 6 13
 
     it "ADA" $ do
       (lang, content) <- readContent "test-data/ada.ada"

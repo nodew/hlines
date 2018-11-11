@@ -158,8 +158,14 @@ data Count = Count
 
 makeLenses ''Count
 
+type SingleComment = T.Text
+type SingleComments = [SingleComment]
+
+type MultiComment = (T.Text, T.Text)
+type MultiComments = [MultiComment]
+
 data Comment = Comment
-  { single :: [T.Text]
-  , multi :: [(T.Text, T.Text)]
+  { single :: SingleComments
+  , multi :: MultiComments
   }
   deriving (Show)
