@@ -1,89 +1,81 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module HLines.FileSpec where
 
 import Test.Hspec
 import HLines.Counter
+import System.IO
+import System.FilePath
+import HLines.Internal
 import HLines.Type
 import HLines.Language
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import System.IO
-import System.IO.Error (IOError)
-import Control.Exception (catch)
-import System.FilePath (takeExtension)
 
-readContent :: FilePath -> IO (Comment, [T.Text])
-readContent file = do
-  content <- T.readFile file `catch` (\(e :: IOError) -> return $ T.pack $ show e)
-  let ext = takeExtension file
-      lang = getLangFromExt $ T.pack ext
-      comments = getCommentStyle lang
-  return (comments, T.lines content)
+readContent :: FilePath -> IO (Comment, Lines)
+readContent fp = do
+  (_, comment, lines) <- readLines fp
+  return (comment, lines)
 
 spec :: Spec
 spec = do
   describe "Count lines of code" $ do
     it "PLASMA" $ do
-      (lang, content) <- readContent "test-data/plasma.c"
-      countLines lang content `shouldBe` Count 32032 8848 3792 44672
+      (comment, content) <- readContent "test-data/plasma.c"
+      countLines comment content `shouldBe` Count 32032 8848 3792 44672
 
     it "FE" $ do
-      (lang, content) <- readContent "test-data/fe25519.c"
-      countLines lang content `shouldBe` Count 278 51 8 (278 + 51 + 8)
+      (comment, content) <- readContent "test-data/fe25519.c"
+      countLines comment content `shouldBe` Count 278 51 8 (278 + 51 + 8)
 
     it "EBC" $ do
-      (lang, content) <- readContent "test-data/ebcdic.c"
-      countLines lang content `shouldBe` Count 165 18 101 (165 + 18 + 101)
+      (comment, content) <- readContent "test-data/ebcdic.c"
+      countLines comment content `shouldBe` Count 165 18 101 (165 + 18 + 101)
 
     it "DUMB" $ do
-      (lang, content) <- readContent "test-data/dumb.c"
-      countLines lang content `shouldBe` Count 2 0 3 5
+      (comment, content) <- readContent "test-data/dumb.c"
+      countLines comment content `shouldBe` Count 2 0 3 5
 
     it "IPL" $ do
-      (lang, content) <- readContent "test-data/ipl_funcs.c"
-      countLines lang content `shouldBe` Count 25 6 43 (25 + 6 + 43)
+      (comment, content) <- readContent "test-data/ipl_funcs.c"
+      countLines comment content `shouldBe` Count 25 6 43 (25 + 6 + 43)
 
     it "RUBY" $ do
-      (lang, content) <- readContent "test-data/test.rb"
-      countLines lang content `shouldBe` Count 2 0 2 4
+      (comment, content) <- readContent "test-data/test.rb"
+      countLines comment content `shouldBe` Count 2 0 2 4
 
     it "OCAML" $ do
-      (lang, content) <- readContent "test-data/ocaml.ml"
-      countLines lang content `shouldBe` Count 3 4 6 13
+      (comment, content) <- readContent "test-data/ocaml.ml"
+      countLines comment content `shouldBe` Count 3 4 6 13
 
     it "ADA" $ do
-      (lang, content) <- readContent "test-data/ada.ada"
-      countLines lang content `shouldBe` Count 4 0 3 7
+      (comment, content) <- readContent "test-data/ada.ada"
+      countLines comment content `shouldBe` Count 4 0 3 7
 
     it "GHERKIN" $ do
-      (lang, content) <- readContent "test-data/gherkin.feature"
-      countLines lang content `shouldBe` Count 8 2 2 12
+      (comment, content) <- readContent "test-data/gherkin.feature"
+      countLines comment content `shouldBe` Count 8 2 2 12
 
     it "GROOVY" $ do
-      (lang, content) <- readContent "test-data/test.groovy"
-      countLines lang content `shouldBe` Count 6 1 10 17
+      (comment, content) <- readContent "test-data/test.groovy"
+      countLines comment content `shouldBe` Count 6 1 10 17
 
     it "TERRAFORM" $ do
-      (lang, content) <- readContent "test-data/test.tf"
-      countLines lang content `shouldBe` Count 65 13 11 (65 + 13 + 11)
+      (comment, content) <- readContent "test-data/test.tf"
+      countLines comment content `shouldBe` Count 65 13 11 (65 + 13 + 11)
 
     it "ZIG" $ do
-      (lang, content) <- readContent "test-data/zig.zig"
-      countLines lang content `shouldBe` Count 5 2 2 9
+      (comment, content) <- readContent "test-data/zig.zig"
+      countLines comment content `shouldBe` Count 5 2 2 9
 
     it "NIX" $ do
-      (lang, content) <- readContent "test-data/test.nix"
-      countLines lang content `shouldBe` Count 3 2 3 8
+      (comment, content) <- readContent "test-data/test.nix"
+      countLines comment content `shouldBe` Count 3 2 3 8
 
     it "POWERSHELL" $ do
-      (lang, content) <- readContent "test-data/test.ps1"
-      countLines lang content `shouldBe` Count 2 1 6 9
+      (comment, content) <- readContent "test-data/test.ps1"
+      countLines comment content `shouldBe` Count 2 1 6 9
 
     it "HANDLEBARS" $ do
-      (lang, content) <- readContent "test-data/test.handlebars"
-      countLines lang content `shouldBe` Count 2 0 2 4
+      (comment, content) <- readContent "test-data/test.handlebars"
+      countLines comment content `shouldBe` Count 2 0 2 4
 
     it "NESTED_HASKELL" $ do
-      (lang, content) <- readContent "test-data/nested-comments.hs"
-      countLines lang content `shouldBe` Count 2 4 8 14
+      (comment, content) <- readContent "test-data/nested-comments.hs"
+      countLines comment content `shouldBe` Count 2 4 8 14

@@ -169,3 +169,5 @@ data Comment = Comment
   , multi :: MultiComments
   }
   deriving (Show)
+
+type Lines = [T.Text]

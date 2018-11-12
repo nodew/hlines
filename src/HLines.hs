@@ -1,3 +1,1 @@
-module HLines (runProg) where
-
-import HLines.Conduit
+module HLines where
