@@ -7,6 +7,9 @@ import Control.Concurrent hiding (yield)
 import Control.Concurrent.Async
 import Control.Exception (catch)
 import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+import Data.IORef
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -20,18 +23,50 @@ import qualified Pipes.Prelude as P
 import qualified Pipes.Safe as PS
 import System.Directory
 import System.FilePath
-import Data.IORef
+import System.FilePath.GlobPattern
 
-sourceFiles :: FilePath -> Producer' FilePath IO ()
-sourceFiles path = do
-  files <- liftIO $ listDirectory path
-  each files >-> P.takeWhile (/= "") >-> P.map (path </>) >->
-    forever
-      (do entry <- await
-          isDir <- liftIO $ doesDirectoryExist entry
-          if isDir
-            then sourceFiles entry
-            else yield entry)
+defaultIgnore = [".git", "vendor", "node_modules"]
+
+filterInclude includePattern =
+  P.filter $ \fp ->
+    if null includePattern
+      then True
+      else any ((~~) fp) includePattern
+
+filterExclude excludePattern = P.filter $ \fp -> not $ any ((~~) fp) excludePattern
+
+filterDefaultIgnore :: MonadIO m => Pipe FilePath FilePath m ()
+filterDefaultIgnore = P.filter $ \fp -> not $ elem fp defaultIgnore
+
+readIgnore :: FilePath -> IO [String]
+readIgnore path = do
+  content <- liftIO $ readFile (path </> ".gitignore")
+  let lines' = lines content
+  return $
+    map
+      (\line ->
+         if last line == '/'
+           then init line
+           else line)
+      lines'
+
+sourceFiles :: MonadIO m => FilePath -> Producer' FilePath (ReaderT ([GlobPattern], [GlobPattern]) m) ()
+sourceFiles fp = do
+  isDir <- liftIO $ doesDirectoryExist fp
+  if not isDir
+    then yield fp
+    else do
+      files <- liftIO $ listDirectory fp
+      (include, exclude) <- ask
+      ignore <-
+        if elem ".gitignore" files
+          then liftIO $ readIgnore fp
+          else return []
+      let exclude' = exclude ++ map (fp </>) ignore
+      each files >-> filterDefaultIgnore >-> P.map (fp </>) >-> filterInclude include >-> filterExclude exclude' >->
+        forever
+          (do entry <- await
+              local (const (include, exclude')) $ sourceFiles entry)
 
 readContent :: Pipe FilePath (Language, Comment, Lines) IO ()
 readContent =
@@ -54,7 +89,8 @@ runP Options {..} = do
   m <- newIORef (Map.empty :: Map.Map Language Count)
   a' <-
     async $ do
-      runEffect $ fromInput input' >-> for cat (\(lang, count) -> liftIO $ modifyIORef' m (flip mergeByLang (lang, count)))
+      runEffect $
+        fromInput input' >-> for cat (\(lang, count) -> liftIO $ modifyIORef' m (flip mergeByLang (lang, count)))
       performGC
   as <-
     forM [1 .. 3] $ \_ ->
@@ -63,9 +99,8 @@ runP Options {..} = do
         performGC
   a <-
     async $ do
-      runEffect $ mapM_ sourceFiles files >-> toOutput output
+      flip runReaderT ([], []) $ runEffect $ mapM_ sourceFiles files >-> toOutput output
       performGC
-  
   mapM_ wait (a' : a : as)
   m' <- readIORef m
   print m'
