@@ -48,6 +48,7 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
+    - -eventlog
     - -with-rtsopts=-maxN4
     dependencies:
     - hlines

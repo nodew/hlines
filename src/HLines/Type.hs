@@ -6,7 +6,7 @@ module HLines.Type where
 import System.FilePath.GlobPattern
 import Control.Lens
 import Data.Data
-import Data.Text as T
+import Data.ByteString as BS
 import Data.Typeable
 
 data Language
@@ -158,10 +158,10 @@ data Count = Count
 
 makeLenses ''Count
 
-type SingleComment = T.Text
+type SingleComment = BS.ByteString
 type SingleComments = [SingleComment]
 
-type MultiComment = (T.Text, T.Text)
+type MultiComment = (BS.ByteString, BS.ByteString)
 type MultiComments = [MultiComment]
 
 data Comment = Comment
@@ -170,4 +170,5 @@ data Comment = Comment
   }
   deriving (Show)
 
-type Lines = [T.Text]
+type Line = BS.ByteString
+type Lines = [Line]

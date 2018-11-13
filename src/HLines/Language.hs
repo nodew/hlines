@@ -3,11 +3,10 @@ module HLines.Language where
 {-
   The rules of Language's extension and comment are all copied from https://github.com/cgag/loc
 -}
-import Data.Text as T
 
 import HLines.Type
 
-getLangFromExt :: T.Text -> Language
+getLangFromExt :: String -> Language
 getLangFromExt ext
   | _of ["4th", "forth", "fr", "frt", "fth", "f83", "fb", "fpm", "e4", "rx", "ft"] = Forth
   | _of ["ada", "adb", "ads", "pad"] = Ada
@@ -122,7 +121,7 @@ getLangFromExt ext
   | _is "hx" = Haxe
   | otherwise = Unknown
   where
-    ext' = T.drop 1 ext
+    ext' = drop 1 ext
     _of = elem ext'
     _is = (==) ext'
 

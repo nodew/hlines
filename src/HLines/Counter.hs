@@ -15,23 +15,27 @@ import qualified Data.Text.IO as T
 import System.FilePath (takeExtension)
 import System.IO
 import System.IO.Error (IOError)
-
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as C
 import HLines.Language
 import HLines.Type
 
 initCount :: Count
 initCount = Count 0 0 0 0
 
-countLines :: Comment -> [T.Text] -> Count
+trimLeft :: BS.ByteString -> BS.ByteString
+trimLeft = C.dropWhile (== ' ')
+
+countLines :: Comment -> Lines -> Count
 countLines comments content = fst $ foldl' (countLine comments) (initCount, [] :: MultiComments) content
 
-countLine :: Comment -> (Count, MultiComments) -> T.Text -> (Count, MultiComments)
+countLine :: Comment -> (Count, MultiComments) -> Line -> (Count, MultiComments)
 countLine comment (count, multiStack) line = countLine' comment (count', multiStack) line'
   where
-    line' = T.stripStart line
+    line' = trimLeft line
     count' = count & total +~ 1
 
-countLine' :: Comment -> (Count, MultiComments) -> T.Text -> (Count, MultiComments)
+countLine' :: Comment -> (Count, MultiComments) -> Line -> (Count, MultiComments)
 -- Empty line
 countLine' _ (count, stack) "" = (count & blank +~ 1, stack)
 -- No Comment
@@ -53,11 +57,11 @@ countLine' Comment {..} (count, []) line
   | otherwise = (count & code +~ 1, stack)
   where
     (stack, sizes) = traverseLine multi [] line
-    withMultiComment = find (\c -> fst c `T.isPrefixOf` line) multi
+    withMultiComment = find (\c -> fst c `BS.isPrefixOf` line) multi
     isWithComment = isJust withMultiComment
     hasCodeInLine =
       if last sizes == 0
-        then not $ snd (fromJust withMultiComment) `T.isSuffixOf` (T.stripEnd line)
+        then not $ snd (fromJust withMultiComment) `BS.isSuffixOf` line
         else False
 -- Current line inside mulitple line comment block
 countLine' Comment {..} (count, stack) line =
@@ -67,27 +71,27 @@ countLine' Comment {..} (count, stack) line =
   where
     (stack', sizes) = traverseLine multi stack line
     hasCodeInLine =
-      or [length (elemIndices 0 sizes) > 1, last sizes == 0 && not (snd (last stack) `T.isSuffixOf` (T.stripEnd line))]
+      or [length (elemIndices 0 sizes) > 1, last sizes == 0 && not (snd (last stack) `BS.isSuffixOf` line)]
 
-prefixWithSingleComment :: [T.Text] -> T.Text -> Bool
-prefixWithSingleComment single line = any (\c -> c `T.isPrefixOf` line) single
+prefixWithSingleComment :: [BS.ByteString] -> Line -> Bool
+prefixWithSingleComment single line = any (\c -> c `BS.isPrefixOf` line) single
 
-traverseLine :: MultiComments -> MultiComments -> T.Text -> (MultiComments, [Int])
+traverseLine :: MultiComments -> MultiComments -> BS.ByteString -> (MultiComments, [Int])
 traverseLine multi stack line = runWriter $ go stack line
   where
-    go, goMulti :: MultiComments -> T.Text -> Writer [Int] MultiComments
+    go, goMulti :: MultiComments -> BS.ByteString -> Writer [Int] MultiComments
     go stack' "" = return stack'
     go [] line' = goMulti [] line'
     go stack'@(x:xs) line' =
-      if (snd x `T.isPrefixOf` line')
+      if (snd x `BS.isPrefixOf` line')
         then do
           tell $ [length xs]
-          go xs $ T.drop (T.length (snd x)) line'
+          go xs $ BS.drop (BS.length (snd x)) line'
         else goMulti stack' line'
     goMulti stack' line' =
-      case find (\c -> fst c `T.isPrefixOf` line') multi of
-        Nothing -> go stack' (T.drop 1 line')
+      case find (\c -> fst c `BS.isPrefixOf` line') multi of
+        Nothing -> go stack' (BS.drop 1 line')
         Just m -> do
           let s = m : stack'
           tell $ [length s]
-          go s $ T.drop (T.length (fst m)) line'
+          go s $ BS.drop (BS.length (fst m)) line'

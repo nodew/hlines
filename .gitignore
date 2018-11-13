@@ -3,3 +3,5 @@ hlines.cabal
 cabal-*
 .DS_Store
 *.prof
+*.eventlog
+*.log
