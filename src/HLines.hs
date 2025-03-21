@@ -9,30 +9,38 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Text (Text)
 import qualified Data.Map.Strict as Map
-import qualified Data.HashMap as HashMap
+import qualified Data.HashMap.Strict as HashMap
 import qualified System.FilePath.Glob as Glob
 import Data.Maybe (fromMaybe, isJust)
 import Control.Concurrent.Async (mapConcurrently, mapConcurrently_)
 import Control.Parallel.Strategies (using, parMap, rdeepseq)
 import Control.DeepSeq (NFData, rnf)
-import qualified Streamly.Prelude as S
-import qualified Streamly.Data.Fold as F
-
-import HLines.Types
-import HLines.Languages
+import qualified Streamly.Data.Stream.Prelude as SP
+import qualified Streamly.Data.Fold.Prelude as SF
+import Control.Applicative ((<|>))
 import Data.Text.Array (new)
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
 
+import HLines.Types
+import HLines.Languages
+
+-- Build extension to language lookup map
+buildExtLangMap :: HashMap.HashMap Text Language
+buildExtLangMap = HashMap.fromList $ do
+    lang <- languages
+    ext <- extensions lang
+    return (ext, lang)
+
+-- Efficient language identification using extension map
 identifyLanguage :: FilePath -> Maybe Language
 identifyLanguage filepath = 
     let ext = T.pack $ takeExtension filepath
         allExt = T.pack $ takeExtensions filepath
         fileName = T.pack $ takeFileName filepath
-        matchExt = filter (\lang -> any (\e -> e == allExt || e == ext || e == fileName) (extensions lang)) languages
-    in case matchExt of
-        (x:_) -> Just x
-        [] -> Nothing  -- Unkown language, just ignore
+    in HashMap.lookup allExt buildExtLangMap  -- Try full extension first - e.g. .tar.gz
+       <|> HashMap.lookup ext buildExtLangMap  -- Try simple extension - e.g. .hs
+       <|> HashMap.lookup fileName buildExtLangMap  -- Try filename - e.g. Dockerfile
 
 -- Parse .gitignore file and get patterns
 readGitignorePatterns :: FilePath -> IO [Glob.Pattern]
@@ -68,7 +76,7 @@ countLines filepath lang = do
 countFileLines :: [Text] -> Language -> ActiveBlockComments -> FileStats
 countFileLines [] _ _ = mempty
 countFileLines (line:rest) lang activeBlocks =
-    let trimmedLine = trim line
+    let trimmedLine = T.strip line
         isBlank = T.null trimmedLine
         
         -- Check if we're in any block comment
@@ -113,10 +121,6 @@ checkForEndBlockComment line (style:rest) =
     if blockEnd style `T.isSuffixOf` line
         then (True, rest)  -- This block comment ended
         else (True, style:rest)  -- Still in block comment
-        
--- Helper functions
-trim :: Text -> Text
-trim = T.strip
 
 dropPrefix :: Text -> Text -> Text
 dropPrefix prefix str = 
@@ -170,10 +174,10 @@ getFilePaths path ignorePatterns = do
 countLinesOfCode :: FilePath -> IO AggratedStats
 countLinesOfCode rootPath = do
     files <- getFilePaths rootPath []
-    S.fold (F.foldlM' (\a b -> return $ a <> b) mempty) $               -- Fold with monadic combine function
-      S.maxThreads (-1) $                  -- Use all available cores
-      S.mapM processFile $               -- Process each file
-      S.fromList files               -- Input stream of files
+    SP.fold (SF.foldlM' (\a b -> return $ a <> b) mempty) $              -- Fold with monadic combine function
+      SP.parEval (SP.maxThreads (-1)) $                                  -- Use all available cores
+      SP.mapM processFile $                                              -- Process each file
+      SP.fromList files                                                  -- Input stream of files
 
 -- Split a list into chunks of specified size
 chunksOf :: Int -> [a] -> [[a]]
