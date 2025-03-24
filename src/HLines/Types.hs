@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module HLines.Types where
 
@@ -9,8 +11,9 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.Hashable (Hashable)
 import Data.Text (Text)
 import Data.Semigroup (Semigroup)
+import GHC.Generics (Generic)
 
-newtype MergeMap k v = MergeMap {getMergeMap :: HashMap.HashMap k v} deriving (Show)
+newtype MergeMap k v = MergeMap {getMergeMap :: HashMap.HashMap k v} deriving (Show, Generic, NFData)
 
 instance (Semigroup v, Eq k, Hashable k) => Semigroup (MergeMap k v) where
   MergeMap x <> MergeMap y = MergeMap $ HashMap.unionWith (<>) x y
@@ -26,7 +29,7 @@ data FileStats = FileStats {
     fileBlank :: !Int,
     fileComment :: !Int,
     fileCode :: !Int
-} deriving (Show, Eq)
+} deriving (Show, Eq, Generic)
 
 instance NFData FileStats where
     rnf (FileStats l b c cd) = rnf l `seq` rnf b `seq` rnf c `seq` rnf cd
@@ -48,7 +51,7 @@ data LanguageStats = LanguageStats {
     langBlank :: !Int,
     langComment :: !Int,
     langCode :: !Int
-} deriving (Show, Eq)
+} deriving (Show, Eq, Generic)
 
 instance NFData LanguageStats where
     rnf (LanguageStats f l b c cd) = rnf f `seq` rnf l `seq` rnf b `seq` rnf c `seq` rnf cd
@@ -65,7 +68,7 @@ instance Semigroup LanguageStats where
 data BlockCommentStyle = BlockCommentStyle {
     blockStart :: !Text,
     blockEnd :: !Text
-} deriving (Show, Eq)
+} deriving (Show, Eq, Generic)
 
 instance NFData BlockCommentStyle where
     rnf (BlockCommentStyle bs be) = rnf bs `seq` rnf be
@@ -75,7 +78,7 @@ data Language = Language {
     extensions :: ![Text],
     lineComments :: ![Text],
     multiLineComments :: ![BlockCommentStyle]
-}
+} deriving (Show, Eq, Generic)
 
 instance NFData Language where
     rnf (Language n exts lc mlc) = rnf n `seq` rnf exts `seq` rnf lc `seq` rnf mlc
@@ -85,13 +88,16 @@ type ActiveBlockComments = [BlockCommentStyle]
 data AggratedStats = AggratedStats {
     byLanguage :: !(MergeMap Text LanguageStats),
     totalStats :: !FileStats
-} deriving (Show)
+} deriving (Show, Generic)
 
 instance Semigroup AggratedStats where
   (AggratedStats lang1 total1) <> (AggratedStats lang2 total2) = 
       let !lang = lang1 <> lang2
           !total = total1 <> total2
       in AggratedStats lang total
+
+instance NFData AggratedStats where
+    rnf (AggratedStats lang total) = rnf lang `seq` rnf total
 
 instance Monoid AggratedStats where
     mempty = AggratedStats mempty mempty

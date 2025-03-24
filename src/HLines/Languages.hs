@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module HLines.Languages where
-    
-import HLines.Types
+
+import qualified Data.HashMap.Strict as HashMap
 import Data.Text (Text)
+
+import HLines.Types
 
 -- Language configuration
 
@@ -35,6 +37,14 @@ languages = [
     Language {
         name = "C++",
         extensions = [".cpp", ".hpp"],
+        lineComments = ["//"],
+        multiLineComments = [
+            BlockCommentStyle "/*" "*/"
+        ]
+    },
+    Language {
+        name = "C#",
+        extensions = [".cs"],
         lineComments = ["//"],
         multiLineComments = [
             BlockCommentStyle "/*" "*/"
@@ -143,14 +153,36 @@ languages = [
         multiLineComments = []
     },
     Language {
+        name = "TOML",
+        extensions = [".toml"],
+        lineComments = ["#"],
+        multiLineComments = []
+    },
+    Language {
+        name = "Dockerfile",
+        extensions = ["Dockerfile"],
+        lineComments = [],
+        multiLineComments = []
+    },
+    Language {
+        name = "Makefile",
+        extensions = ["Makefile"],
+        lineComments = ["#"],
+        multiLineComments = []
+    },
+    Language {
         name = "Unkown",
         extensions = [],
         lineComments = [],
         multiLineComments = []
     }]
 
+extentionToLangMap :: HashMap.HashMap Text Language
+extentionToLangMap = HashMap.fromList $ do
+    lang <- languages
+    ext <- extensions lang
+    return (ext, lang)
+
 -- Get a language configuration from a file extension
 getLanguageFromExtension :: Text -> Maybe Language
-getLanguageFromExtension ext = case filter (\l -> ext `elem` extensions l) languages of
-    [] -> Nothing
-    (l:_) -> Just l
+getLanguageFromExtension ext = HashMap.lookup ext extentionToLangMap

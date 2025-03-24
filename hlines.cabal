@@ -78,8 +78,6 @@ library
                     , hashable
                     , hashmap
                     , unordered-containers
-                    , streamly
-                    , streamly-core
                     , bytestring
                     , timeit
 
@@ -91,7 +89,7 @@ executable hlines
     -- Import common warning flags.
     import:           warnings
 
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -prof -fprof-auto
+    ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
 
     -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
