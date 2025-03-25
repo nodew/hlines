@@ -75,6 +75,7 @@ library
                     , bytestring
                     , containers
                     , conduit
+                    , conduit-extra
                     , deepseq
                     , directory
                     , filepath
@@ -84,7 +85,6 @@ library
                     , parallel
                     , streamly
                     , streamly-core
-                    , text
                     , timeit
                     , unordered-containers
 
@@ -110,7 +110,7 @@ executable hlines
     -- Other library packages from which modules are imported.
     build-depends:    base >=4.18.0.0
                     , hlines
-                    , text
+                    , bytestring
                     , timeit
 
     -- Directories containing source files.

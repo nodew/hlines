@@ -3,7 +3,7 @@ module Main where
 
 import System.Environment (getArgs)
 import System.TimeIt (timeItT)
-import qualified Data.Text.IO as TIO
+import qualified Data.ByteString.Char8 as BSC
 
 import HLines.Conduit
 import HLines.Utils
@@ -14,6 +14,6 @@ main = do
     case args of
         [path] -> do
             (execTime, results) <- timeItT $ countLinesOfCode path
-            TIO.putStrLn $ formatResults results
+            BSC.putStrLn $ formatResults results
             putStrLn $ "Execution time: " ++ show execTime
-        _ -> TIO.putStrLn "Usage: hlines <path>"
+        _ -> BSC.putStrLn "Usage: hlines <path>"

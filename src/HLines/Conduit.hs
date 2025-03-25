@@ -9,8 +9,10 @@ import Control.Exception (evaluate, SomeException, try)
 import System.IO (IOMode(..), withFile, hSetEncoding, utf8)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (fromMaybe)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
+import Data.ByteString (ByteString)
+import qualified Data.Conduit.Binary as CB
 import qualified Data.HashMap.Strict as HashMap
 import qualified System.FilePath.Glob as Glob
 import Control.Concurrent (getNumCapabilities)
@@ -20,29 +22,47 @@ import HLines.Types
 import HLines.Languages
 import HLines.Utils
 
-countLinesConduit :: FilePath -> Language -> IO FileStats
-countLinesConduit file lang = do
+countFileLinesConduit :: FilePath -> Language -> IO FileStats
+countFileLinesConduit file lang = do
     exists <- doesFileExist file
-    if not exists then return mempty else
-        runConduitRes $
-            sourceFile file
-            .| decodeUtf8C
-            .| linesUnboundedC
-            .| foldlC countLineTypes mempty
+    if not exists 
+        then return mempty 
+        else do
+            (stats, _) <- runConduitRes $
+                CB.sourceFile file
+                .| CB.lines
+                .| foldlC processLine (mempty, [])
+            return stats
   where
-    countLineTypes !acc line =
-        let trimmed = T.strip line
-        in if T.null trimmed
-            then acc <> FileStats 1 1 0 0
-            else if any (`T.isPrefixOf` trimmed) (lineComments lang)
-                then acc <> FileStats 1 0 1 0
-                else acc <> FileStats 1 0 0 1
+    processLine (!acc, !activeBlocks) line =
+        let !trimmed = BSC.strip line
+            !isBlank = BS.null trimmed
+            
+            (!isInBlockComment, !newActiveBlocks) = 
+                if null activeBlocks
+                    then checkForNewBlockComment trimmed (multiLineComments lang)
+                    else checkForEndBlockComment trimmed activeBlocks
+            
+            !isLineComment = not isInBlockComment && not isBlank && 
+                                any (`BS.isPrefixOf` trimmed) (lineComments lang)
+
+            !lineType 
+                | isBlank = Blank
+                | isInBlockComment || isLineComment = Comment
+                | otherwise = Code
+
+            !currentStats = case lineType of
+                Blank -> FileStats 1 1 0 0
+                Comment -> FileStats 1 0 1 0
+                Code -> FileStats 1 0 0 1
+
+        in (currentStats <> acc, newActiveBlocks)
 
 processFile :: FilePath -> IO AggratedStats
 processFile file = case identifyLanguage file of
     Nothing    -> return mempty
     Just lang  -> do
-        stats <- countLinesConduit file lang
+        stats <- countFileLinesConduit file lang
         return $! singleAggratedStats (name lang) stats
 
 getFilePathsConduit :: FilePath -> ConduitT () FilePath (ResourceT IO) ()

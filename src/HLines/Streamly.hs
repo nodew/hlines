@@ -7,9 +7,9 @@ module HLines.Streamly where
 
 import Control.Concurrent (getNumCapabilities)
 import Control.Monad (filterM)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import Data.Text (Text)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
+import Data.ByteString (ByteString)
 import Data.Maybe (isJust)
 import System.Directory (doesFileExist, doesDirectoryExist, listDirectory)
 import System.FilePath ((</>), takeFileName)
@@ -92,17 +92,17 @@ countLines filepath lang = Stream.bracketIO
             if eof
                 then return Nothing
                 else do
-                    line <- T.pack <$> hGetLine handle
-                    let !trimmedLine = T.strip line
-                    let !isBlank = T.null trimmedLine
+                    line <- BSC.hGetLine handle
+                    let !trimmedLine = BSC.strip line
+                    let !isBlank = BS.null trimmedLine
                     
                     let (!isInBlockComment, !newActiveBlocks) = 
                             if null activeBlocks
                                 then checkForNewBlockComment trimmedLine (multiLineComments lang)
                                 else checkForEndBlockComment trimmedLine activeBlocks
                         
-                        !isLineComment = not isInBlockComment && not isBlank && 
-                                        any (`T.isPrefixOf` trimmedLine) (lineComments lang)
+                    let !isLineComment = not isInBlockComment && not isBlank && 
+                                        any (`BS.isPrefixOf` trimmedLine) (lineComments lang)
                         
                         !lineType 
                             | isBlank = Blank

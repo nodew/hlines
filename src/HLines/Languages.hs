@@ -2,7 +2,8 @@
 module HLines.Languages where
 
 import qualified Data.HashMap.Strict as HashMap
-import Data.Text (Text)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
 
 import HLines.Types
 
@@ -177,12 +178,12 @@ languages = [
         multiLineComments = []
     }]
 
-extentionToLangMap :: HashMap.HashMap Text Language
+extentionToLangMap :: HashMap.HashMap ByteString Language
 extentionToLangMap = HashMap.fromList $ do
     lang <- languages
     ext <- extensions lang
     return (ext, lang)
 
 -- Get a language configuration from a file extension
-getLanguageFromExtension :: Text -> Maybe Language
+getLanguageFromExtension :: ByteString -> Maybe Language
 getLanguageFromExtension ext = HashMap.lookup ext extentionToLangMap

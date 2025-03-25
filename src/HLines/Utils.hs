@@ -7,9 +7,9 @@ import System.Environment (getArgs)
 import System.Directory (doesFileExist, doesDirectoryExist, listDirectory, withCurrentDirectory)
 import System.FilePath (takeExtension, (</>), takeFileName, takeExtensions)
 import Control.Monad (filterM, foldM)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import Data.Text (Text)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
+import Data.ByteString (ByteString)
 import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HashMap
 import qualified System.FilePath.Glob as Glob
@@ -20,7 +20,6 @@ import Control.DeepSeq (NFData, rnf, force)
 import qualified Streamly.Data.Stream.Prelude as SP
 import qualified Streamly.Data.Fold.Prelude as SF
 import Control.Applicative ((<|>))
-import Data.Text.Array (new)
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
 import Control.Exception (evaluate, SomeException, try)
@@ -36,9 +35,9 @@ chunksOf n xs = take n xs : chunksOf n (drop n xs)
 
 identifyLanguage :: FilePath -> Maybe Language
 identifyLanguage filepath = 
-    let ext = T.pack $ takeExtension filepath
-        allExt = T.pack $ takeExtensions filepath
-        fileName = T.pack $ takeFileName filepath
+    let ext = BSC.pack $ takeExtension filepath
+        allExt = BSC.pack $ takeExtensions filepath
+        fileName = BSC.pack $ takeFileName filepath
     in getLanguageFromExtension allExt           -- Try full extension first - e.g. .tar.gz
        <|> getLanguageFromExtension ext          -- Try simple extension - e.g. .hs
        <|> getLanguageFromExtension fileName     -- Try filename - e.g. Dockerfile
@@ -51,15 +50,15 @@ readGitignorePatterns dir = do
         then do
             content <- withFile gitignorePath ReadMode $ \h -> do
                 hSetEncoding h utf8
-                TIO.hGetContents h
-            let patterns = map (Glob.compile . T.unpack . unifiedPattern) $ filter isValidPattern $ T.lines content
+                BSC.hGetContents h
+            let patterns = map (Glob.compile . BSC.unpack . unifiedPattern) $ filter isValidPattern $ BSC.lines content
             return $! patterns
         else return []
   where
-    isValidPattern line = not (T.null line) && not ("#" `T.isPrefixOf` line)
-    unifiedPattern pattern = if T.last pattern == '/' then T.init pattern else pattern
+    isValidPattern line = not (BS.null line) && not ("#" `BS.isPrefixOf` line)
+    unifiedPattern pattern = if BSC.last pattern == '/' then BS.init pattern else pattern
 
-defaultIgnoredFolders :: [Text]
+defaultIgnoredFolders :: [ByteString]
 defaultIgnoredFolders = [
     ".git", 
     ".svn", 
@@ -76,40 +75,40 @@ defaultIgnoredFolders = [
     ]
 
 isDefaultIgnoredFolder :: FilePath -> Bool
-isDefaultIgnoredFolder path = any ((==) (T.pack path)) defaultIgnoredFolders
+isDefaultIgnoredFolder path = any ((==) (BSC.pack path)) defaultIgnoredFolders
 
 -- Check if a file should be ignored based on .gitignore patterns
 shouldIgnore :: [Glob.Pattern] -> FilePath -> Bool
 shouldIgnore patterns path = any (\pattern -> Glob.match pattern path) patterns
 
 -- Check if a line starts a new block comment
-checkForNewBlockComment :: Text -> [BlockCommentStyle] -> (Bool, ActiveBlockComments)
+checkForNewBlockComment :: ByteString -> [BlockCommentStyle] -> (Bool, ActiveBlockComments)
 checkForNewBlockComment line styles =
-    let possibleStarts = [style | style <- styles, blockStart style `T.isPrefixOf` line]
+    let possibleStarts = [style | style <- styles, blockStart style `BS.isPrefixOf` line]
     in if null possibleStarts
        then (False, [])
        else 
            case possibleStarts of
-               (style:_) -> if blockEnd style `T.isSuffixOf` dropPrefix (blockStart style) line
+               (style:_) -> if blockEnd style `BS.isSuffixOf` dropPrefix (blockStart style) line
                            then (True, [])       -- Block comment starts and ends on same line
                            else (True, [style])  -- Block comment starts but doesn't end
                [] -> (False, []) -- This case is already handled by the outer if, but adding for completeness
 
 -- Check if a line ends an active block comment
-checkForEndBlockComment :: Text -> ActiveBlockComments -> (Bool, ActiveBlockComments)
+checkForEndBlockComment :: ByteString -> ActiveBlockComments -> (Bool, ActiveBlockComments)
 checkForEndBlockComment _ [] = (False, [])
 checkForEndBlockComment line (style:rest) =
-    if blockEnd style `T.isSuffixOf` line
+    if blockEnd style `BS.isSuffixOf` line
         then (True, rest)         -- This block comment ended
         else (True, style:rest)   -- Still in block comment
 
-dropPrefix :: Text -> Text -> Text
+dropPrefix :: ByteString -> ByteString -> ByteString
 dropPrefix prefix str = 
-    if prefix `T.isPrefixOf` str
-        then T.drop (T.length prefix) str
+    if prefix `BS.isPrefixOf` str
+        then BS.drop (BS.length prefix) str
         else str
 
-singleAggratedStats :: Text -> FileStats -> AggratedStats
+singleAggratedStats :: ByteString -> FileStats -> AggratedStats
 singleAggratedStats lang stats = AggratedStats
     { byLanguage = MergeMap $ HashMap.singleton lang langStats
     , totalStats = stats
@@ -118,29 +117,29 @@ singleAggratedStats lang stats = AggratedStats
         !langStats = LanguageStats 1 (fileLines stats) (fileBlank stats) (fileComment stats) (fileCode stats)
 
 -- Format the results
-formatResults :: AggratedStats -> Text
+formatResults :: AggratedStats -> ByteString
 formatResults results = 
-    T.concat [
+    BS.concat [
         "Language Stats:\n",
         "----------------\n",
-        T.intercalate "\n" (map formatLangStats (HashMap.toList (getMergeMap $ byLanguage results))),
+        BS.intercalate "\n" (map formatLangStats (HashMap.toList (getMergeMap $ byLanguage results))),
         "\n\nTotal Stats:\n",
         "----------------\n",
         formatTotalStats (totalStats results)
     ]
   where
-    formatLangStats (lang, stats) = T.concat [
+    formatLangStats (lang, stats) = BS.concat [
         lang, ":\n",
-        "  Files: ", T.pack (show (fileCount stats)), "\n",
-        "  Lines of Code: ", T.pack (show (langCode stats)), "\n",
-        "  Lines of Comments: ", T.pack (show (langComment stats)), "\n",
-        "  Blank Lines: ", T.pack (show (langBlank stats)), "\n",
-        "  Total Lines: ", T.pack (show (langCode stats + langComment stats + langBlank stats))
+        "  Files: ", BSC.pack (show (fileCount stats)), "\n",
+        "  Lines of Code: ", BSC.pack (show (langCode stats)), "\n",
+        "  Lines of Comments: ", BSC.pack (show (langComment stats)), "\n",
+        "  Blank Lines: ", BSC.pack (show (langBlank stats)), "\n",
+        "  Total Lines: ", BSC.pack (show (langCode stats + langComment stats + langBlank stats))
         ]
         
-    formatTotalStats stats = T.concat [
-        "Lines of Code: ", T.pack (show (fileCode stats)), "\n",
-        "Lines of Comments: ", T.pack (show (fileComment stats)), "\n",
-        "Blank Lines: ", T.pack (show (fileBlank stats)), "\n",
-        "Total Lines: ", T.pack (show (fileCode stats + fileComment stats + fileBlank stats))
+    formatTotalStats stats = BS.concat [
+        "Lines of Code: ", BSC.pack (show (fileCode stats)), "\n",
+        "Lines of Comments: ", BSC.pack (show (fileComment stats)), "\n",
+        "Blank Lines: ", BSC.pack (show (fileBlank stats)), "\n",
+        "Total Lines: ", BSC.pack (show (fileCode stats + fileComment stats + fileBlank stats))
         ]

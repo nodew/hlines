@@ -7,9 +7,9 @@ import System.Environment (getArgs)
 import System.Directory (doesFileExist, doesDirectoryExist, listDirectory, withCurrentDirectory)
 import System.FilePath (takeExtension, (</>), takeFileName, takeExtensions)
 import Control.Monad (filterM, foldM)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import Data.Text (Text)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
+import Data.ByteString (ByteString)
 import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HashMap
 import qualified System.FilePath.Glob as Glob
@@ -20,7 +20,6 @@ import Control.DeepSeq (NFData, rnf, force)
 import qualified Streamly.Data.Stream.Prelude as SP
 import qualified Streamly.Data.Fold.Prelude as SF
 import Control.Applicative ((<|>))
-import Data.Text.Array (new)
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
 import Control.Exception (evaluate, SomeException, try)
@@ -42,21 +41,21 @@ countLines filepath lang = do
                     putStrLn $ "Warning: Could not read file " ++ filepath ++ ": " ++ show err
                     return mempty
                 Right content -> do
-                    let !result = countFileLines (T.lines content) lang [] 
+                    let !result = countFileLines (BSC.lines content) lang [] 
                     return $! force result
         else return mempty
 
-tryReadFile :: FilePath -> IO (Either SomeException Text)
+tryReadFile :: FilePath -> IO (Either SomeException ByteString)
 tryReadFile filepath = try $ withFile filepath ReadMode $ \h -> do
     hSetEncoding h utf8
-    TIO.hGetContents h
+    BS.hGetContents h
 
 -- Enhanced line counting with the refactored structure
-countFileLines :: [Text] -> Language -> ActiveBlockComments -> FileStats
+countFileLines :: [ByteString] -> Language -> ActiveBlockComments -> FileStats
 countFileLines [] _ _ = mempty
 countFileLines (line:rest) lang activeBlocks =
-    let !trimmedLine = T.strip line
-        !isBlank = T.null trimmedLine
+    let !trimmedLine = BSC.strip line
+        !isBlank = BS.null trimmedLine
         
         -- Check if we're in any block comment
         (!isInBlockComment, !newActiveBlocks) = 
@@ -66,7 +65,7 @@ countFileLines (line:rest) lang activeBlocks =
                 
         -- Check for line comments if not in block comment
         !isLineComment = not isInBlockComment && not isBlank && 
-                        any (`T.isPrefixOf` trimmedLine) (lineComments lang)
+                        any (`BS.isPrefixOf` trimmedLine) (lineComments lang)
                 
         !lineType 
             | isBlank = Blank
@@ -79,7 +78,6 @@ countFileLines (line:rest) lang activeBlocks =
             Code -> FileStats 1 0 0 1
 
     in currentStats <> countFileLines rest lang newActiveBlocks
-
 
 -- Process a single file and return its stats mapped to language
 processFile :: FilePath -> IO AggratedStats
@@ -105,13 +103,13 @@ getFilePaths path ignorePatterns = do
                 let !currentIgnorePatterns = ignorePatterns <> subIgnorePatterns
                 entries <- listDirectory path
                 let filteredEntries = filter (not . isDefaultIgnoredFolder) entries
-                let fullPaths = map (path </>) (filteredEntries)
+                let fullPaths = map (path </>) filteredEntries
                 
                 let notIgnored = filter (not . shouldIgnore currentIgnorePatterns) fullPaths
                 
                 (filePaths, dirPaths) <- do
                     files <- filterM doesFileExist notIgnored
-                    dirs <- filterM (\folder -> doesDirectoryExist folder) notIgnored
+                    dirs <- filterM doesDirectoryExist notIgnored
                     return (files, dirs)
                 
                 chunkSize <- (`max` 1) . (`div` 4) <$> getNumCapabilities

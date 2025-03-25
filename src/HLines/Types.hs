@@ -9,7 +9,8 @@ module HLines.Types where
 import Control.DeepSeq (NFData, rnf)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Hashable (Hashable)
-import Data.Text (Text)
+import qualified Data.ByteString.Char8 as BS
+import Data.ByteString (ByteString)
 import Data.Semigroup (Semigroup)
 import GHC.Generics (Generic)
 
@@ -66,17 +67,17 @@ instance Semigroup LanguageStats where
         in LanguageStats f l b c cd
 
 data BlockCommentStyle = BlockCommentStyle {
-    blockStart :: !Text,
-    blockEnd :: !Text
+    blockStart :: !ByteString,
+    blockEnd :: !ByteString
 } deriving (Show, Eq, Generic)
 
 instance NFData BlockCommentStyle where
     rnf (BlockCommentStyle bs be) = rnf bs `seq` rnf be
 
 data Language = Language {
-    name :: !Text,
-    extensions :: ![Text],
-    lineComments :: ![Text],
+    name :: !ByteString,
+    extensions :: ![ByteString],
+    lineComments :: ![ByteString],
     multiLineComments :: ![BlockCommentStyle]
 } deriving (Show, Eq, Generic)
 
@@ -86,7 +87,7 @@ instance NFData Language where
 type ActiveBlockComments = [BlockCommentStyle]
 
 data AggratedStats = AggratedStats {
-    byLanguage :: !(MergeMap Text LanguageStats),
+    byLanguage :: !(MergeMap ByteString LanguageStats),
     totalStats :: !FileStats
 } deriving (Show, Generic)
 

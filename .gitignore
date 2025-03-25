@@ -2,5 +2,5 @@ bin
 dist-newstyle
 dist
 .vscode
-.prof
+*.prof
 node_modules/
