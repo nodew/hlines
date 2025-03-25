@@ -4,7 +4,9 @@ module Main where
 import System.Environment (getArgs)
 import System.TimeIt (timeItT)
 import qualified Data.Text.IO as TIO
-import HLines
+
+import HLines.Conduit
+import HLines.Utils
 
 main :: IO ()
 main = do
