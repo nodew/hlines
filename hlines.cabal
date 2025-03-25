@@ -75,6 +75,7 @@ library
                     , bytestring
                     , containers
                     , conduit
+                    , mtl
                     , conduit-extra
                     , deepseq
                     , directory

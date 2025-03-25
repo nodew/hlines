@@ -27,6 +27,7 @@ import Streamly.Data.Fold (Fold)
 import HLines.Types
 import HLines.Languages
 import HLines.Utils
+import Control.DeepSeq (force)
 
 -- Stream files from the filesystem
 discoverFiles :: FilePath -> [Glob.Pattern] -> Stream IO FilePath
@@ -93,28 +94,10 @@ countLines filepath lang = Stream.bracketIO
                 then return Nothing
                 else do
                     line <- BSC.hGetLine handle
-                    let !trimmedLine = BSC.strip line
-                    let !isBlank = BS.null trimmedLine
                     
-                    let (!isInBlockComment, !newActiveBlocks) = 
-                            if null activeBlocks
-                                then checkForNewBlockComment trimmedLine (multiLineComments lang)
-                                else checkForEndBlockComment trimmedLine activeBlocks
-                        
-                    let !isLineComment = not isInBlockComment && not isBlank && 
-                                        any (`BS.isPrefixOf` trimmedLine) (lineComments lang)
-                        
-                        !lineType 
-                            | isBlank = Blank
-                            | isInBlockComment || isLineComment = Comment
-                            | otherwise = Code
+                    let (currentStats, newActiveBlocks) = processLine lang (mempty, activeBlocks) line
 
-                        !currentStats = case lineType of
-                            Blank -> FileStats 1 1 0 0
-                            Comment -> FileStats 1 0 1 0
-                            Code -> FileStats 1 0 0 1
-
-                    return $ Just (currentStats, (newActiveBlocks, handle))
+                    return $! force Just (currentStats, (newActiveBlocks, handle))
 
 -- Process files concurrently and aggregate stats
 countLinesOfCode :: FilePath -> IO AggratedStats

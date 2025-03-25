@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RankNTypes #-}
 
 module HLines.Utils where
 
@@ -23,10 +24,12 @@ import Control.Applicative ((<|>))
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
 import Control.Exception (evaluate, SomeException, try)
-import System.IO (IOMode(..), withFile, hSetEncoding, utf8)
+import System.IO (IOMode(..), withFile, hSetEncoding, utf8, hIsEOF, Handle)
+import qualified Streamly.Data.Stream as Stream
 
 import HLines.Types
 import HLines.Languages
+import Control.Monad.IO.Class (MonadIO (..))
 
 -- Split a list into chunks of specified size
 chunksOf :: Int -> [a] -> [[a]]
@@ -115,6 +118,33 @@ singleAggratedStats lang stats = AggratedStats
     }
     where
         !langStats = LanguageStats 1 (fileLines stats) (fileBlank stats) (fileComment stats) (fileCode stats)
+
+processLine :: Language -> (FileStats, ActiveBlockComments) -> ByteString -> (FileStats, ActiveBlockComments)
+processLine lang (stats, activeBlocks) line =
+    let !trimmedLine = BSC.strip line
+        !isBlank = BS.null trimmedLine
+        
+        -- Check if we're in any block comment
+        (!isInBlockComment, !newActiveBlocks) = 
+            if null activeBlocks
+                then checkForNewBlockComment trimmedLine (multiLineComments lang)
+                else checkForEndBlockComment trimmedLine activeBlocks
+                
+        -- Check for line comments if not in block comment
+        !isLineComment = not isInBlockComment && not isBlank && 
+                        any (`BS.isPrefixOf` trimmedLine) (lineComments lang)
+                
+        !lineType 
+            | isBlank = Blank
+            | isInBlockComment || isLineComment = Comment
+            | otherwise = Code
+
+        !currentStats = case lineType of
+            Blank -> FileStats 1 1 0 0
+            Comment -> FileStats 1 0 1 0
+            Code -> FileStats 1 0 0 1
+
+    in  (stats <> currentStats, newActiveBlocks)
 
 -- Format the results
 formatResults :: AggratedStats -> ByteString

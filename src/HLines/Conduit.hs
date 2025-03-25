@@ -17,6 +17,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified System.FilePath.Glob as Glob
 import Control.Concurrent (getNumCapabilities)
 import Conduit
+import Control.DeepSeq (force)
 
 import HLines.Types
 import HLines.Languages
@@ -32,32 +33,7 @@ countFileLinesConduit file lang = do
                 CB.sourceFile file
                 .| CB.lines
                 .| foldlC (processLine lang) (mempty, [])
-            return stats
-
-processLine :: Language -> (FileStats, [BlockCommentStyle]) -> ByteString -> (FileStats, ActiveBlockComments)
-processLine lang (!acc, !activeBlocks) line =
-    let !trimmed = BSC.strip line
-        !isBlank = BS.null trimmed
-        
-        (!isInBlockComment, !newActiveBlocks) = 
-            if null activeBlocks
-                then checkForNewBlockComment trimmed (multiLineComments lang)
-                else checkForEndBlockComment trimmed activeBlocks
-        
-        !isLineComment = not isInBlockComment && not isBlank && 
-                            any (`BS.isPrefixOf` trimmed) (lineComments lang)
-
-        !lineType 
-            | isBlank = Blank
-            | isInBlockComment || isLineComment = Comment
-            | otherwise = Code
-
-        !currentStats = case lineType of
-            Blank -> FileStats 1 1 0 0
-            Comment -> FileStats 1 0 1 0
-            Code -> FileStats 1 0 0 1
-
-    in (currentStats <> acc, newActiveBlocks)
+            return $! force stats
 
 processFile :: FilePath -> IO AggratedStats
 processFile file = case identifyLanguage file of

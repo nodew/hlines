@@ -1,12 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RankNTypes #-}
+
+{-# LANGUAGE LambdaCase #-}
 
 module HLines.Parallel where
 
+import Control.Monad.State
+import Control.Monad.Fix (fix)
 import System.Environment (getArgs)
 import System.Directory (doesFileExist, doesDirectoryExist, listDirectory, withCurrentDirectory)
 import System.FilePath (takeExtension, (</>), takeFileName, takeExtensions)
-import Control.Monad (filterM, foldM)
+import Control.Monad (filterM, foldM, unless)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString (ByteString)
@@ -23,7 +28,7 @@ import Control.Applicative ((<|>))
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
 import Control.Exception (evaluate, SomeException, try)
-import System.IO (IOMode(..), withFile, hSetEncoding, utf8)
+import System.IO (IOMode(..), withFile, hSetEncoding, utf8, Handle, hIsEOF)
 
 import HLines.Types
 import HLines.Languages
@@ -35,49 +40,29 @@ countLines filepath lang = do
     exists <- doesFileExist filepath
     if exists
         then do
-            result <- tryReadFile filepath
+            result <- tryReadFile filepath processLinesFromHandle
             case result of
                 Left err -> do
                     putStrLn $ "Warning: Could not read file " ++ filepath ++ ": " ++ show err
                     return mempty
                 Right content -> do
-                    let !result = countFileLines (BSC.lines content) lang [] 
-                    return $! force result
+                    return $! force (fst content)
         else return mempty
+    where
+        processLinesFromHandle :: Handle -> IO (FileStats, ActiveBlockComments)
+        processLinesFromHandle handle = flip execStateT (mempty, []) $ fix $ \loop -> do
+            eof <- liftIO $ hIsEOF handle
+            unless eof $ do
+                line <- liftIO $ BSC.hGetLine handle
+                (stats, activeBlocks) <- get
+                let (!newStats, !newActiveBlocks) = processLine lang (stats, activeBlocks) line
+                put (newStats, newActiveBlocks)
+                loop
 
-tryReadFile :: FilePath -> IO (Either SomeException ByteString)
-tryReadFile filepath = try $ withFile filepath ReadMode $ \h -> do
+tryReadFile :: forall a. FilePath -> (Handle -> IO a) -> IO (Either SomeException a)
+tryReadFile filepath handle = try $ withFile filepath ReadMode $ \h -> do
     hSetEncoding h utf8
-    BS.hGetContents h
-
--- Enhanced line counting with the refactored structure
-countFileLines :: [ByteString] -> Language -> ActiveBlockComments -> FileStats
-countFileLines [] _ _ = mempty
-countFileLines (line:rest) lang activeBlocks =
-    let !trimmedLine = BSC.strip line
-        !isBlank = BS.null trimmedLine
-        
-        -- Check if we're in any block comment
-        (!isInBlockComment, !newActiveBlocks) = 
-            if null activeBlocks
-                then checkForNewBlockComment trimmedLine (multiLineComments lang)
-                else checkForEndBlockComment trimmedLine activeBlocks
-                
-        -- Check for line comments if not in block comment
-        !isLineComment = not isInBlockComment && not isBlank && 
-                        any (`BS.isPrefixOf` trimmedLine) (lineComments lang)
-                
-        !lineType 
-            | isBlank = Blank
-            | isInBlockComment || isLineComment = Comment
-            | otherwise = Code
-
-        !currentStats = case lineType of
-            Blank -> FileStats 1 1 0 0
-            Comment -> FileStats 1 0 1 0
-            Code -> FileStats 1 0 0 1
-
-    in currentStats <> countFileLines rest lang newActiveBlocks
+    handle h
 
 -- Process a single file and return its stats mapped to language
 processFile :: FilePath -> IO AggratedStats
