@@ -2,18 +2,12 @@
 
 module HLines.Conduit where
 
-import System.Environment (getArgs)
 import System.Directory (doesFileExist, doesDirectoryExist, listDirectory)
-import System.FilePath (takeExtension, (</>), takeFileName, takeExtensions)
-import Control.Exception (evaluate, SomeException, try)
+import System.FilePath ((</>), takeFileName)
+import Control.Exception (SomeException, try)
 import System.IO (IOMode(..), withFile, hSetEncoding, utf8)
 import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (fromMaybe)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
-import Data.ByteString (ByteString)
 import qualified Data.Conduit.Binary as CB
-import qualified Data.HashMap.Strict as HashMap
 import qualified System.FilePath.Glob as Glob
 import Control.Concurrent (getNumCapabilities)
 import Conduit
@@ -21,7 +15,7 @@ import Control.DeepSeq (force)
 
 import HLines.Types
 import HLines.Languages
-import HLines.Utils
+import HLines.Utils hiding (processFile)
 
 countFileLinesConduit :: FilePath -> Language -> IO FileStats
 countFileLinesConduit file lang = do

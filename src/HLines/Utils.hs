@@ -9,7 +9,9 @@ import System.Directory (doesFileExist, doesDirectoryExist, listDirectory, withC
 import System.FilePath (takeExtension, (</>), takeFileName, takeExtensions)
 import Control.Monad (filterM, foldM)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.ByteString (ByteString)
 import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HashMap
@@ -145,6 +147,28 @@ processLine lang (stats, activeBlocks) line =
             Code -> FileStats 1 0 0 1
 
     in  (stats <> currentStats, newActiveBlocks)
+
+processLine' :: Language -> (FileStats, ActiveBlockComments) -> BL.ByteString -> (FileStats, ActiveBlockComments)
+processLine' lang (stats, activeBlocks) line = processLine lang (stats, activeBlocks) (BL.toStrict line)
+
+countLines :: FilePath -> Language -> IO FileStats
+countLines filepath lang = do
+    exists <- doesFileExist filepath
+    if exists
+        then do
+            contents <- BLC.readFile filepath
+            return $! force fst $ foldl (processLine' lang) (mempty, []) (BLC.lines contents)
+        else return mempty
+
+processFile :: FilePath -> IO AggratedStats
+processFile file = do
+    let lang = identifyLanguage file
+    case lang of
+        Nothing -> return mempty
+        Just lang -> do
+            stats <- countLines file lang
+            let !result = singleAggratedStats (name lang) stats
+            return $! force result
 
 -- Format the results
 formatResults :: AggratedStats -> ByteString
