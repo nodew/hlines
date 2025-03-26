@@ -5,7 +5,7 @@ import System.Environment (getArgs)
 import System.TimeIt (timeItT)
 import qualified Data.ByteString.Char8 as BSC
 
-import HLines.Parallel
+import HLines.STM
 import HLines.Utils
 
 main :: IO ()

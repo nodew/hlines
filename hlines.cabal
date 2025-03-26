@@ -65,6 +65,7 @@ library
                     , HLines.Parallel
                     , HLines.Conduit
                     , HLines.Streamly
+                    , HLines.STM
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -85,6 +86,7 @@ library
                     , hashable
                     , hashmap
                     , parallel
+                    , stm
                     , streamly
                     , streamly-core
                     , timeit
