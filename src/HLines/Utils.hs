@@ -26,6 +26,8 @@ import Control.Applicative ((<|>))
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
 import Control.Exception (evaluate, SomeException, try)
+import Data.List (sortOn, intercalate)
+import Data.Ord (Down(..))
 import System.IO (IOMode(..), withFile, hSetEncoding, utf8, hIsEOF, Handle)
 import qualified Streamly.Data.Stream as Stream
 
@@ -177,27 +179,43 @@ processFile file = do
 -- Format the results
 formatResults :: AggratedStats -> ByteString
 formatResults results = 
-    BS.concat [
-        "Language Stats:\n",
-        "----------------\n",
-        BS.intercalate "\n" (map formatLangStats (HashMap.toList (getMergeMap $ byLanguage results))),
-        "\n\nTotal Stats:\n",
-        "----------------\n",
-        formatTotalStats (totalStats results)
-    ]
+    let header = ["Language", "Files", "Code", "Comments", "Blank", "Total"]
+        rows = map formatRow langStats ++ [formatTotalRow (totalStats results)]
+        colWidths = map (maximum . map length) $ transpose (header : rows)
+        separator = BSC.pack $ "+" ++ intercalate "+" (map (flip replicate '-' . (+2)) colWidths) ++ "+"
+        formatLine cells = BSC.pack $ "| " ++ intercalate " | " (zipWith pad colWidths cells) ++ " |"
+        
+    in BS.intercalate "\n" $ 
+        [ separator
+        , formatLine header
+        , separator
+        ] ++ map formatLine (init rows) ++ [separator, formatLine (last rows), separator]
   where
-    formatLangStats (lang, stats) = BS.concat [
-        lang, ":\n",
-        "  Files: ", BSC.pack (show (fileCount stats)), "\n",
-        "  Lines of Code: ", BSC.pack (show (langCode stats)), "\n",
-        "  Lines of Comments: ", BSC.pack (show (langComment stats)), "\n",
-        "  Blank Lines: ", BSC.pack (show (langBlank stats)), "\n",
-        "  Total Lines: ", BSC.pack (show (langCode stats + langComment stats + langBlank stats))
+    pad width str = str ++ replicate (width - length str) ' '
+    
+    langStats = sortOn (Down . fileCount . snd) $ HashMap.toList (getMergeMap $ byLanguage results)
+
+    totalFileCount = sum $ map (fileCount . snd) langStats
+
+    transpose :: [[a]] -> [[a]]
+    transpose [] = []
+    transpose ([] : xss) = transpose xss
+    transpose ((x:xs) : xss) = (x : [h | (h:_) <- xss]) : transpose (xs : [t | (_:t) <- xss])
+    
+    formatRow (lang, stats) = 
+        [ BSC.unpack lang
+        , show (fileCount stats)
+        , show (langCode stats)
+        , show (langComment stats)
+        , show (langBlank stats)
+        , show (langCode stats + langComment stats + langBlank stats)
         ]
         
-    formatTotalStats stats = BS.concat [
-        "Lines of Code: ", BSC.pack (show (fileCode stats)), "\n",
-        "Lines of Comments: ", BSC.pack (show (fileComment stats)), "\n",
-        "Blank Lines: ", BSC.pack (show (fileBlank stats)), "\n",
-        "Total Lines: ", BSC.pack (show (fileCode stats + fileComment stats + fileBlank stats))
+    formatTotalRow stats = 
+        [ "Total"
+        , show totalFileCount
+        , show (fileCode stats)
+        , show (fileComment stats)
+        , show (fileBlank stats)
+        , show (fileCode stats + fileComment stats + fileBlank stats)
         ]

@@ -94,6 +94,10 @@ library
                     , text
                     , timeit
                     , unordered-containers
+                    , brick >= 2.1
+                    , vty >= 5.25
+                    , vector >= 0.12
+                    , vty-crossplatform
 
     hs-source-dirs:   src
 
