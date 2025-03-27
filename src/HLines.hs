@@ -1,4 +1,1 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
-module HLines where
-
+module HLines () where
