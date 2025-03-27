@@ -38,10 +38,14 @@ chunksOf :: Int -> [a] -> [[a]]
 chunksOf _ [] = []
 chunksOf n xs = take n xs : chunksOf n (drop n xs)
 
+safeTail :: [a] -> [a]
+safeTail [] = []
+safeTail (_:xs) = xs
+
 identifyLanguage :: FilePath -> Maybe Language
 identifyLanguage filepath = 
-    let ext = BSC.pack $ takeExtension filepath
-        allExt = BSC.pack $ takeExtensions filepath
+    let ext = BSC.pack $ safeTail $ takeExtension filepath
+        allExt = BSC.pack $ safeTail $ takeExtensions filepath
         fileName = BSC.pack $ takeFileName filepath
     in getLanguageFromExtension allExt           -- Try full extension first - e.g. .tar.gz
        <|> getLanguageFromExtension ext          -- Try simple extension - e.g. .hs
