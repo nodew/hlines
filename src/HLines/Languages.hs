@@ -12,6 +12,28 @@ import HLines.Types
 languages :: [Language]
 languages =
   [ Language
+      { name = "Ada",
+        extensions = [".ada", ".adb", ".ads"],
+        lineComments = ["--"],
+        multiLineComments = []
+      },
+    Language
+      { name = "Agda",
+        extensions = [".agda"],
+        lineComments = ["--"],
+        multiLineComments =
+          [ BlockCommentStyle "{-" "-}"
+          ]
+      },
+    Language
+      { name = "Assembly",
+        extensions = [".s", ".asm"],
+        lineComments = [";"],
+        multiLineComments =
+          [ BlockCommentStyle "/*" "*/"
+          ]
+      },
+    Language
       { name = "Haskell",
         extensions = [".hs", ".lhs"],
         lineComments = ["--"],
@@ -20,8 +42,22 @@ languages =
           ]
       },
     Language
+      { name = "PHP",
+        extensions = [".php"],
+        lineComments = ["#", "//"],
+        multiLineComments =
+          [ BlockCommentStyle "/*" "*/"
+          ]
+      },
+    Language
+      { name = "Perl",
+        extensions = [".pl", ".pm"],
+        lineComments = ["#"],
+        multiLineComments = []
+      },
+    Language
       { name = "Python",
-        extensions = [".py"],
+        extensions = [".py", ".pyw", ".pyi"],
         lineComments = ["#"],
         multiLineComments =
           [ BlockCommentStyle "\"\"\"" "\"\"\""
@@ -45,7 +81,7 @@ languages =
       },
     Language
       { name = "C#",
-        extensions = [".cs"],
+        extensions = [".cs", ".csx"],
         lineComments = ["//"],
         multiLineComments =
           [ BlockCommentStyle "/*" "*/"
@@ -61,7 +97,7 @@ languages =
       },
     Language
       { name = "JavaScript",
-        extensions = [".js"],
+        extensions = [".js", ".mjs"],
         lineComments = ["//"],
         multiLineComments =
           [ BlockCommentStyle "/*" "*/"
@@ -84,12 +120,58 @@ languages =
           ]
       },
     Language
-      { name = "Rust",
-        extensions = [".rs"],
+      { name = "F#",
+        extensions = [".fs", ".fsi", ".fsx", ".fsscript"],
+        lineComments = ["//"],
+        multiLineComments =
+          [ BlockCommentStyle "(*" "*)"
+          ]
+      },
+    Language
+      { name = "Go",
+        extensions = [".go"],
         lineComments = ["//"],
         multiLineComments =
           [ BlockCommentStyle "/*" "*/"
           ]
+      },
+    Language
+      { name = "Julia",
+        extensions = [".jl"],
+        lineComments = ["#"],
+        multiLineComments =
+          [ BlockCommentStyle "#=" "=#"
+          ]
+      },
+    Language
+      { name = "Kotlin",
+        extensions = [".kt", ".kts"],
+        lineComments = ["//"],
+        multiLineComments =
+          [ BlockCommentStyle "/*" "*/"
+          ]
+      },
+    Language
+      { name = "MATLAB",
+        extensions = [".m"],
+        lineComments = ["%"],
+        multiLineComments =
+          [ BlockCommentStyle "%{" "}%"
+          ]
+      },
+    Language
+      { name = "OCaml",
+        extensions = [".ml", ".mli"],
+        lineComments = [],
+        multiLineComments =
+          [ BlockCommentStyle "(*" "*)"
+          ]
+      },
+    Language
+      { name = "R",
+        extensions = [".r"],
+        lineComments = ["#"],
+        multiLineComments = []
       },
     Language
       { name = "Ruby",
@@ -100,16 +182,42 @@ languages =
           ]
       },
     Language
+      { name = "Rust",
+        extensions = [".rs"],
+        lineComments = ["//"],
+        multiLineComments =
+          [ BlockCommentStyle "/*" "*/"
+          ]
+      },
+    Language
       { name = "Shell",
         extensions = [".sh"],
         lineComments = ["#"],
         multiLineComments = []
       },
     Language
+      { name = "Scala",
+        extensions = [".sc", ".scala"],
+        lineComments = ["//"],
+        multiLineComments =
+          [ BlockCommentStyle "/*" "*/"
+          ]
+      },
+    Language
       { name = "SQL",
-        extensions = ["sql"],
+        extensions = [".sql", ".dml", ".ddl", ".dql"],
         lineComments = ["--"],
-        multiLineComments = []
+        multiLineComments = 
+          [ BlockCommentStyle "/*" "*/"
+          ]
+      },
+    Language
+      { name = "Swift",
+        extensions = [".swift"],
+        lineComments = ["//"],
+        multiLineComments =
+          [ BlockCommentStyle "/*" "*/"
+          ]
       },
     Language
       { name = "HTML",
@@ -154,6 +262,12 @@ languages =
         multiLineComments = []
       },
     Language
+      { name = "TCL",
+        extensions = [".tcl"],
+        lineComments = ["#"],
+        multiLineComments = []
+      },
+    Language
       { name = "TOML",
         extensions = [".toml"],
         lineComments = ["#"],
@@ -169,12 +283,6 @@ languages =
       { name = "Makefile",
         extensions = ["Makefile"],
         lineComments = ["#"],
-        multiLineComments = []
-      },
-    Language
-      { name = "Unkown",
-        extensions = [],
-        lineComments = [],
         multiLineComments = []
       }
   ]
