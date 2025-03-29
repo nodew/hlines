@@ -2,7 +2,7 @@
 
 module HLines.Conduit where
 
-import Conduit
+import Conduit hiding (fst)
 import Control.Concurrent (getNumCapabilities)
 import Control.DeepSeq (force)
 import Control.Exception (SomeException, try)
@@ -29,12 +29,12 @@ countFileLinesConduit file lang = do
             .| foldlC (processLine lang) (mempty, [])
       return $! force stats
 
-processFile :: FilePath -> IO AggratedStats
+processFile :: FilePath -> IO AggregatedStats
 processFile file = case identifyLanguage file of
   Nothing -> return mempty
   Just lang -> do
     stats <- countFileLinesConduit file lang
-    return $! singleAggratedStats (name lang) stats
+    return $! singleAggregatedStats (name lang) stats
 
 getFilePathsConduit :: FilePath -> ConduitT () FilePath (ResourceT IO) ()
 getFilePathsConduit root = yield root .| traverseDir []
@@ -52,7 +52,7 @@ getFilePathsConduit root = yield root .| traverseDir []
           yieldMany filtered .| traverseDir patterns
         else yield dir
 
-countLinesOfCode :: FilePath -> IO AggratedStats
+countLinesOfCode :: FilePath -> IO AggregatedStats
 countLinesOfCode root = do
   numCores <- getNumCapabilities
   runConduitRes $

@@ -25,6 +25,7 @@ import qualified Streamly.Data.Fold.Prelude as SF
 import Control.Applicative ((<|>))
 import Control.Concurrent (getNumCapabilities)
 import qualified Control.Monad as F
+import Control.Monad.State.Strict
 import Control.Exception (evaluate, SomeException, try)
 import Data.List (sortOn, intercalate)
 import Data.Ord (Down(..))
@@ -45,7 +46,7 @@ safeTail [] = []
 safeTail (_:xs) = xs
 
 identifyLanguage :: FilePath -> Maybe Language
-identifyLanguage filepath = 
+identifyLanguage filepath =
     let ext = BSC.pack $ safeTail $ takeExtension filepath
         allExt = BSC.pack $ safeTail $ takeExtensions filepath
         fileName = BSC.pack $ takeFileName filepath
@@ -71,13 +72,13 @@ readGitignorePatterns dir = do
 
 defaultIgnoredFolders :: [ByteString]
 defaultIgnoredFolders = [
-    ".git", 
-    ".svn", 
-    ".hg", 
-    ".idea", 
-    ".vscode", 
+    ".git",
+    ".svn",
+    ".hg",
+    ".idea",
+    ".vscode",
     ".vs",
-    ".stack-work", 
+    ".stack-work",
     ".cabal-sandbox",
     "dist",
     "node_modules",
@@ -98,7 +99,7 @@ checkForNewBlockComment line styles =
     let possibleStarts = [style | style <- styles, blockStart style `BS.isPrefixOf` line]
     in if null possibleStarts
        then (False, [])
-       else 
+       else
            case possibleStarts of
                (style:_) -> if blockEnd style `BS.isSuffixOf` dropPrefix (blockStart style) line
                            then (True, [])       -- Block comment starts and ends on same line
@@ -114,48 +115,56 @@ checkForEndBlockComment line (style:rest) =
         else (True, style:rest)   -- Still in block comment
 
 dropPrefix :: ByteString -> ByteString -> ByteString
-dropPrefix prefix str = 
+dropPrefix prefix str =
     if prefix `BS.isPrefixOf` str
         then BS.drop (BS.length prefix) str
         else str
 
-singleAggratedStats :: ByteString -> FileStats -> AggratedStats
-singleAggratedStats lang stats = AggratedStats
+singleAggregatedStats :: ByteString -> FileStats -> AggregatedStats
+singleAggregatedStats lang stats = AggregatedStats
     { byLanguage = MergeMap $ HashMap.singleton lang langStats
     , totalStats = stats
     }
     where
         !langStats = LanguageStats 1 (fileLines stats) (fileBlank stats) (fileComment stats) (fileCode stats)
 
-processLine :: Language -> (FileStats, ActiveBlockComments) -> ByteString -> (FileStats, ActiveBlockComments)
-processLine lang (stats, activeBlocks) line =
+-- Internal version using State monad
+processLineState :: Language -> ByteString -> State (FileStats, ActiveBlockComments) ()
+processLineState lang line = do
     let !trimmedLine = BSC.strip line
-        !isBlank = BS.null trimmedLine
-        
-        -- Check if we're in any block comment
-        (!isInBlockComment, !newActiveBlocks) = 
+    let !isBlank = BS.null trimmedLine
+
+    -- Get current state
+    (stats, activeBlocks) <- get
+
+    -- Check block comments
+    let (!isInBlockComment, !newActiveBlocks) =
             if null activeBlocks
                 then checkForNewBlockComment trimmedLine (multiLineComments lang)
                 else checkForEndBlockComment trimmedLine activeBlocks
-                
-        -- Check for line comments if not in block comment
-        !isLineComment = not isInBlockComment && not isBlank && 
+
+    -- Check line comments
+    let !isLineComment = not isInBlockComment && not isBlank &&
                         any (`BS.isPrefixOf` trimmedLine) (lineComments lang)
-                
-        !lineType 
+
+    -- Determine line type
+    let !lineType
             | isBlank = Blank
             | isInBlockComment || isLineComment = Comment
             | otherwise = Code
 
-        !currentStats = case lineType of
+    -- Calculate new stats
+    let !currentStats = case lineType of
             Blank -> FileStats 1 1 0 0
             Comment -> FileStats 1 0 1 0
             Code -> FileStats 1 0 0 1
 
-    in  (stats <> currentStats, newActiveBlocks)
+    -- Update state
+    put $! (stats <> currentStats, newActiveBlocks)
 
-processLine' :: Language -> (FileStats, ActiveBlockComments) -> BL.ByteString -> (FileStats, ActiveBlockComments)
-processLine' lang (stats, activeBlocks) line = processLine lang (stats, activeBlocks) (BL.toStrict line)
+-- External version for compatibility with existing code
+processLine :: Language -> (FileStats, ActiveBlockComments) -> ByteString -> (FileStats, ActiveBlockComments)
+processLine lang state line = execState (processLineState lang line) state
 
 countLines :: FilePath -> Language -> IO FileStats
 countLines filepath lang = do
@@ -163,36 +172,37 @@ countLines filepath lang = do
     if exists
         then do
             contents <- BLC.readFile filepath
-            return $! force fst $ foldl (processLine' lang) (mempty, []) (BLC.lines contents)
+            let (stats, _) = execState (mapM_ (\line -> processLineState lang (BL.toStrict line)) (BLC.lines contents)) (mempty, [])
+            return $! force stats
         else return mempty
 
-processFile :: FilePath -> IO AggratedStats
+processFile :: FilePath -> IO AggregatedStats
 processFile file = do
     let lang = identifyLanguage file
     case lang of
         Nothing -> return mempty
         Just lang -> do
             stats <- countLines file lang
-            let !result = singleAggratedStats (name lang) stats
+            let !result = singleAggregatedStats (name lang) stats
             return $! force result
 
 -- Format the results
-formatResults :: AggratedStats -> ByteString
-formatResults results = 
+formatResults :: AggregatedStats -> ByteString
+formatResults results =
     let header = ["Language", "Files", "Code", "Comments", "Blank", "Total"]
         rows = map formatRow langStats ++ [formatTotalRow (totalStats results)]
         colWidths = map (maximum . map length) $ transpose (header : rows)
         separator = BSC.pack $ "+" ++ intercalate "+" (map (flip replicate '-' . (+2)) colWidths) ++ "+"
         formatLine cells = BSC.pack $ "| " ++ intercalate " | " (zipWith pad colWidths cells) ++ " |"
-        
-    in BS.intercalate "\n" $ 
+
+    in BS.intercalate "\n" $
         [ separator
         , formatLine header
         , separator
         ] ++ map formatLine (init rows) ++ [separator, formatLine (last rows), separator]
   where
     pad width str = str ++ replicate (width - length str) ' '
-    
+
     langStats = sortOn (Down . fileCount . snd) $ HashMap.toList (getMergeMap $ byLanguage results)
 
     totalFileCount = sum $ map (fileCount . snd) langStats
@@ -201,8 +211,8 @@ formatResults results =
     transpose [] = []
     transpose ([] : xss) = transpose xss
     transpose ((x:xs) : xss) = (x : [h | (h:_) <- xss]) : transpose (xs : [t | (_:t) <- xss])
-    
-    formatRow (lang, stats) = 
+
+    formatRow (lang, stats) =
         [ BSC.unpack lang
         , show (fileCount stats)
         , show (langCode stats)
@@ -210,8 +220,8 @@ formatResults results =
         , show (langBlank stats)
         , show (langCode stats + langComment stats + langBlank stats)
         ]
-        
-    formatTotalRow stats = 
+
+    formatTotalRow stats =
         [ "Total"
         , show totalFileCount
         , show (fileCode stats)

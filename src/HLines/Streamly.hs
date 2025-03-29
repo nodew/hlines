@@ -69,7 +69,7 @@ discoverFiles rootPath ignorePatterns = processPath rootPath
         Right result -> pure result
 
 -- Process files concurrently and aggregate stats
-countLinesOfCode :: FilePath -> IO AggratedStats
+countLinesOfCode :: FilePath -> IO AggregatedStats
 countLinesOfCode rootPath = do
   numCores <- getNumCapabilities
   -- Process files with basic concurrency
@@ -78,5 +78,5 @@ countLinesOfCode rootPath = do
       Stream.filter (isJust . identifyLanguage) $
         discoverFiles rootPath []
   where
-    foldStats :: Fold IO AggratedStats AggratedStats
+    foldStats :: Fold IO AggregatedStats AggregatedStats
     foldStats = Fold.foldl' (<>) mempty

@@ -1,6 +1,6 @@
-# HLines
+# hlines
 
-HLines is a high-performance line counting tool for source code, implemented in Haskell. It demonstrates different approaches to parallel and asynchronous programming by providing multiple processing strategies:
+hlines is a high-performance line counting tool for source code, implemented in Haskell. It demonstrates different approaches to parallel and asynchronous programming by providing multiple processing strategies:
 
 - **Parallel**: Uses Haskell's parallel processing capabilities
 - **STM**: Implements Software Transactional Memory for concurrent operations

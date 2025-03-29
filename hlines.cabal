@@ -58,8 +58,7 @@ common warnings
 
 library
     -- Modules included in this library.
-    exposed-modules:  HLines
-                    , HLines.Types
+    exposed-modules:  HLines.Types
                     , HLines.Languages
                     , HLines.Utils
                     , HLines.Parallel

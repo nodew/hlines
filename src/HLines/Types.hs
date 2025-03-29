@@ -90,21 +90,21 @@ instance NFData Language where
 
 type ActiveBlockComments = [BlockCommentStyle]
 
-data AggratedStats = AggratedStats
+data AggregatedStats = AggregatedStats
   { byLanguage :: !(MergeMap ByteString LanguageStats),
     totalStats :: !FileStats
   }
   deriving (Show, Generic)
 
-instance Semigroup AggratedStats where
-  (AggratedStats lang1 total1) <> (AggratedStats lang2 total2) =
+instance Semigroup AggregatedStats where
+  (AggregatedStats lang1 total1) <> (AggregatedStats lang2 total2) =
     let !lang = lang1 <> lang2
         !total = total1 <> total2
-     in AggratedStats lang total
+     in AggregatedStats lang total
 
-instance NFData AggratedStats where
-  rnf (AggratedStats lang total) = rnf lang `seq` rnf total
+instance NFData AggregatedStats where
+  rnf (AggregatedStats lang total) = rnf lang `seq` rnf total
 
-instance Monoid AggratedStats where
-  mempty = AggratedStats mempty mempty
+instance Monoid AggregatedStats where
+  mempty = AggregatedStats mempty mempty
   mappend = (<>)

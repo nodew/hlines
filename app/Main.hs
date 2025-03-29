@@ -7,7 +7,7 @@ import qualified HLines.Conduit as Conduit
 import qualified HLines.Parallel as Parallel
 import qualified HLines.STM as STM
 import qualified HLines.Streamly as Streamly
-import HLines.Types (AggratedStats)
+import HLines.Types (AggregatedStats)
 import HLines.Utils
 import System.Environment (getArgs)
 import System.TimeIt (timeItT)
@@ -22,7 +22,7 @@ parseStrategy "streamly" = Just Streamly
 parseStrategy "conduit" = Just Conduit
 parseStrategy _ = Nothing
 
-getCountLinesFunc :: Strategy -> (FilePath -> IO AggratedStats)
+getCountLinesFunc :: Strategy -> (FilePath -> IO AggregatedStats)
 getCountLinesFunc Parallel = Parallel.countLinesOfCode
 getCountLinesFunc STM = STM.countLinesOfCode
 getCountLinesFunc Streamly = Streamly.countLinesOfCode

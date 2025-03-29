@@ -40,7 +40,7 @@ discoverFiles rootPath ignorePatterns = processPath rootPath
               force concat <$> forConcurrently notIgnored processPath
             else return []
 
-countLinesOfCode :: FilePath -> IO AggratedStats
+countLinesOfCode :: FilePath -> IO AggregatedStats
 countLinesOfCode rootPath = do
   numCores <- getNumCapabilities
   files <- discoverFiles rootPath []

@@ -69,7 +69,7 @@ traverseDirectory' fileQueue state path ignorePatterns = do
         else do
           atomically $ writeTQueue fileQueue fullPath
 
-fileProcessor :: FileTQueue -> TraversalState -> TVar AggratedStats -> IO ()
+fileProcessor :: FileTQueue -> TraversalState -> TVar AggregatedStats -> IO ()
 fileProcessor fileQueue state statsVar = do
   mfile <- atomically $ tryReadTQueue fileQueue
   case mfile of
@@ -83,7 +83,7 @@ fileProcessor fileQueue state statsVar = do
       atomically $ modifyTVar' statsVar (<> stats)
       fileProcessor fileQueue state statsVar
 
-countLinesOfCode :: FilePath -> IO AggratedStats
+countLinesOfCode :: FilePath -> IO AggregatedStats
 countLinesOfCode rootPath = do
   numCores <- getNumCapabilities
 
